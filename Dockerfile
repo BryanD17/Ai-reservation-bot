@@ -1,17 +1,14 @@
-# Use a Node base image
-FROM node:18
+# Use official n8n image
+FROM n8nio/n8n
 
-# Set working directory
-WORKDIR /app
+# Optional: Copy your workflow file into the container (can also import via UI)
+COPY n8n_voice_reservation_final_mvp.json /data/workflows/
 
-# Copy all files
-COPY . .
+# Set the working directory
+WORKDIR /data
 
-# Install dependencies
-RUN npm install
-
-# Expose the port your app uses
+# Expose n8n's default port
 EXPOSE 5678
 
-# Start your app
-CMD ["npm", "start"]
+# Start n8n
+CMD ["n8n"]
