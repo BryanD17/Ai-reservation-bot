@@ -1,14 +1,14 @@
 # Use the official n8n image
 FROM n8nio/n8n:latest
 
-# Set the working directory
-WORKDIR /data
+# Set working directory
+WORKDIR /home/node
 
-# Copy your local files (including .env if needed)
+# Copy everything into the container
 COPY . .
 
-# Expose port 5678 (default for n8n)
-EXPOSE 5678
+# Ensure correct permissions (especially for the .n8n config folder)
+RUN chown -R node:node /home/node
 
-# Start n8n
+# Use the default startup command (n8n)
 CMD ["n8n"]
