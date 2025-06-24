@@ -1,8 +1,17 @@
-FROM n8nio/n8n:latest
+# Use a Node base image
+FROM node:18
 
-WORKDIR /home/node
+# Set working directory
+WORKDIR /app
 
-# Remove this line if .env file isn't present (let Railway handle env vars)
-# COPY .env .env
+# Copy all files
+COPY . .
 
-CMD ["n8n"]
+# Install dependencies
+RUN npm install
+
+# Expose the port your app uses
+EXPOSE 5678
+
+# Start your app
+CMD ["npm", "start"]
