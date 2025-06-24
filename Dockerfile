@@ -1,11 +1,9 @@
 FROM node:18-alpine
 
-# Git + OpenSSH needed for github:<repo> syntax
-RUN apk add --no-cache git openssh
+RUN apk add --no-cache git   # git alone is enough for HTTPS
 
-# Install n8n and OpenAI nodes
 RUN npm install -g n8n@1.44.0 \
-    && npm install -g github:n8n-io/n8n-nodes-openai \
+    && npm install -g git+https://github.com/n8n-io/n8n-nodes-openai.git \
     && npm cache clean --force
 
 WORKDIR /data
