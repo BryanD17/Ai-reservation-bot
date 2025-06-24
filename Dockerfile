@@ -1,17 +1,16 @@
-# Use official n8n image
-FROM n8nio/n8n
+FROM n8nio/n8n:latest
 
-# Optional: working directory (used internally by n8n)
+# Optional: Set working directory
 WORKDIR /home/node
 
-# Optional: You can copy your workflow JSON only (not full repo)
+# Optional: Copy in your workflow JSON
 COPY n8n_voice_reservation_final_mvp.json /home/node/
 
-# Set this to prevent permission issues in future
+# Optional: Set env to fix config permissions warning
 ENV N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
 
-# Default port n8n runs on
+# Expose the n8n port
 EXPOSE 5678
 
-# Start n8n automatically
+# Start n8n
 CMD ["n8n"]
