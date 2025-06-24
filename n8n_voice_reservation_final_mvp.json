@@ -1,157 +1,264 @@
 {
-  "name": "Final Voice Reservation MVP",
+  "name": "Voice Reservation MVP 2025",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "call-incoming",
-        "responseMode": "onReceived"
+        "path": "voice-reservation",
+        "responseMode": "onReceived",
+        "options": {}
       },
-      "id": "1",
-      "name": "Webhook Trigger",
+      "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
         200,
         300
-      ]
+      ],
+      "id": 1
     },
     {
       "parameters": {
-        "url": "={{$json[\"RecordingUrl\"]}}.mp3",
+        "requestMethod": "GET",
+        "url": "={{ $json.body.RecordingUrl }}",
         "responseFormat": "file",
-        "binaryPropertyName": "audio"
+        "options": {
+          "fullResponse": false,
+          "timeout": 900
+        }
       },
-      "id": "2",
-      "name": "Download Audio",
+      "id": 2,
+      "name": "Download Recording",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 1,
+      "typeVersion": 2,
       "position": [
-        400,
+        460,
         300
       ]
     },
     {
       "parameters": {
         "resource": "audio",
-        "operation": "transcribe",
+        "operation": "transcribeRecording",
+        "binaryProperty": "data",
         "model": "whisper-1",
-        "binaryPropertyName": "audio"
+        "responseFormat": "text"
       },
-      "id": "3",
       "name": "Transcribe Audio",
-      "type": "n8n-nodes-base.openAi",
-      "typeVersion": 2,
-      "position": [
-        600,
-        300
-      ],
-      "credentials": {
-        "openAiApi": {
-          "id": "1",
-          "name": "OpenAI Main"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "model": "gpt-4o",
-        "prompt": "Extract reservation info from this transcription:\n{{$json.text}}\n\nReturn JSON:\n{ \"name\": \"John\", \"people\": 2, \"date\": \"2025-07-01\", \"time\": \"19:00\", \"phone\": \"+1234567890\" }",
-        "temperature": 0.3
-      },
-      "id": "4",
-      "name": "Extract Info (GPT-4o)",
-      "type": "n8n-nodes-base.openAi",
-      "typeVersion": 2,
-      "position": [
-        800,
-        300
-      ],
-      "credentials": {
-        "openAiApi": {
-          "id": "1",
-          "name": "OpenAI Main"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "create",
-        "calendar": "primary",
-        "start": "={{$json.date}}T{{$json.time}}:00",
-        "end": "={{$json.date}}T{{$json.time}}:59",
-        "summary": "Reservation for {{$json.name}}",
-        "description": "Table for {{$json.people}} guests"
-      },
-      "id": "5",
-      "name": "Create Calendar Event",
-      "type": "n8n-nodes-base.googleCalendar",
+      "type": "n8n-nodes-openai.OpenAI",
       "typeVersion": 1,
+      "id": 3,
+      "credentials": {
+        "OpenAI Api": {
+          "id": "openai_env",
+          "name": "OpenAI (ENV)"
+        }
+      },
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "messageModel",
+        "model": "gpt-4o-mini",
+        "messagesUi": {
+          "messageValues": [
+            {
+              "role": "system",
+              "content": "You are a reservation assistant for a restaurant. Extract:\n- customer_name\n- party_size (integer)\n- reservation_date (YYYY-MM-DD)\n- reservation_time (24h HH:MM)\nIf any info missing ask follow\u2011up.\nRespond ONLY with JSON keys: name, party, date, time."
+            },
+            {
+              "role": "user",
+              "content": "{{ $json[\"text\"] }}"
+            }
+          ]
+        },
+        "responseFormat": "json_object"
+      },
+      "name": "Extract info (GPT\u20114o)",
+      "type": "n8n-nodes-openai.OpenAI",
+      "typeVersion": 1,
+      "id": 4,
+      "credentials": {
+        "OpenAI Api": {
+          "id": "openai_env",
+          "name": "OpenAI (ENV)"
+        }
+      },
       "position": [
         1000,
         300
-      ],
-      "credentials": {
-        "googleCalendarOAuth2Api": {
-          "id": "4",
-          "name": "Google Calendar API"
-        }
-      }
+      ]
     },
     {
       "parameters": {
-        "command": "\nINSERT INTO reservations (name, party_size, res_date, res_time, phone)\nVALUES ('{{$json.name}}', {{$json.people}}, '{{$json.date}}', '{{$json.time}}', '{{$json.phone}}');\n"
+        "functionCode": "const data = JSON.parse(items[0].json.choices[0].message.content);\nreturn [{json:data}];"
       },
-      "id": "6",
-      "name": "Log to Supabase",
+      "name": "Parse JSON",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "id": 5,
+      "position": [
+        1240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.opentable.com/check",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\"date\": $json[\"date\"],\"time\": $json[\"time\"],\"party\": $json[\"party\"]}"
+      },
+      "name": "Check OpenTable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "id": 6,
+      "position": [
+        1500,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.available}}"
+            }
+          ]
+        }
+      },
+      "name": "If Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "id": 7,
+      "position": [
+        1740,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "messageModel",
+        "model": "gpt-4o-mini",
+        "messagesUi": {
+          "messageValues": [
+            {
+              "role": "system",
+              "content": "Given reservation unavailable, suggest next nearest time slot 30\u201190 minutes around same date. Respond JSON {\"suggested_time\":\"HH:MM\"}"
+            },
+            {
+              "role": "user",
+              "content": "Date: {{$json.date}}, Time: {{$json.time}}"
+            }
+          ]
+        },
+        "responseFormat": "json_object"
+      },
+      "name": "Suggest Time",
+      "type": "n8n-nodes-openai.OpenAI",
+      "typeVersion": 1,
+      "id": 8,
+      "credentials": {
+        "OpenAI Api": {
+          "id": "openai_env",
+          "name": "OpenAI (ENV)"
+        }
+      },
+      "position": [
+        1980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "table": "reservations",
+        "columns": "name,party,date,time,code",
+        "values": "={{$json[\"name\"]}},={{$json[\"party\"]}},={{$json[\"date\"]}},={{$json[\"time\"]}},={{$json[\"code\"]}}"
+      },
+      "name": "Insert Supabase",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 1,
-      "position": [
-        1200,
-        300
-      ],
+      "id": 9,
       "credentials": {
         "postgres": {
-          "id": "2",
-          "name": "Supabase DB"
+          "id": "supabase_env",
+          "name": "Supabase (ENV)"
         }
-      }
+      },
+      "position": [
+        1980,
+        100
+      ]
     },
     {
       "parameters": {
-        "to": "={{$json.phone}}",
-        "from": "YOUR_TWILIO_NUMBER",
-        "message": "Reservation confirmed for {{$json.name}} at {{$json.time}} on {{$json.date}}."
+        "functionCode": "const code=Math.floor(1000+Math.random()*9000).toString();items[0].json.code=code;return items;"
       },
-      "id": "7",
-      "name": "Send Confirmation SMS",
+      "name": "Generate Code",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "id": 10,
+      "position": [
+        1740,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "from": "={{$env.TWILIO_PHONE_NUMBER}}",
+        "to": "={{$json.phone || \"+11234567890\"}}",
+        "message": "={{`Your reservation at Joe's Bistro for ${$json.party} on ${$json.date} at ${$json.time} is confirmed. Code: ${$json.code}`}}"
+      },
+      "name": "Send SMS",
       "type": "n8n-nodes-base.twilio",
       "typeVersion": 1,
-      "position": [
-        1400,
-        300
-      ],
+      "id": 11,
       "credentials": {
         "twilioApi": {
-          "id": "3",
-          "name": "Twilio Main"
+          "id": "twilio_env",
+          "name": "Twilio (ENV)"
         }
-      }
+      },
+      "position": [
+        2220,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "httpCode": 200,
+        "responseData": "={{$json}}"
+      },
+      "name": "Return JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "id": 12,
+      "position": [
+        2460,
+        100
+      ]
     }
   ],
   "connections": {
-    "Webhook Trigger": {
+    "Webhook": {
       "main": [
         [
           {
-            "node": "Download Audio",
+            "node": "Download Recording",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Download Audio": {
+    "Download Recording": {
       "main": [
         [
           {
@@ -166,40 +273,102 @@
       "main": [
         [
           {
-            "node": "Extract Info (GPT-4o)",
+            "node": "Extract info (GPT\u20114o)",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract Info (GPT-4o)": {
+    "Extract info (GPT\u20114o)": {
       "main": [
         [
           {
-            "node": "Create Calendar Event",
+            "node": "Parse JSON",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Create Calendar Event": {
+    "Parse JSON": {
       "main": [
         [
           {
-            "node": "Log to Supabase",
+            "node": "Generate Code",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Log to Supabase": {
+    "Generate Code": {
       "main": [
         [
           {
-            "node": "Send Confirmation SMS",
+            "node": "Check OpenTable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check OpenTable": {
+      "main": [
+        [
+          {
+            "node": "If Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Available?": {
+      "main": [
+        [
+          {
+            "node": "Insert Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suggest Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Supabase": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggest Time": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS": {
+      "main": [
+        [
+          {
+            "node": "Return JSON",
             "type": "main",
             "index": 0
           }
@@ -208,6 +377,6 @@
     }
   },
   "active": false,
-  "settings": {},
-  "versionId": "f0f88b09-600f-432a-880d-5f2b5ad73543"
+  "createdAt": "2025-06-24T07:53:42.274580Z",
+  "id": "93d592f6"
 }
