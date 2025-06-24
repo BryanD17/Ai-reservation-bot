@@ -1,13 +1,1 @@
-FROM node:18-alpine
-
-RUN apk add --no-cache git   # git alone is enough for HTTPS
-
-RUN npm install -g n8n@1.44.0 \
-    && npm install -g git+https://github.com/n8n-io/n8n-nodes-openai.git \
-    && npm cache clean --force
-
-WORKDIR /data
-COPY n8n_voice_reservation_final_mvp.json /data/
-ENV N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
-EXPOSE 5678
-CMD ["n8n"]
+<paste the Dockerfile above>
