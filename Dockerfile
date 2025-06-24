@@ -7,8 +7,5 @@ WORKDIR /home/node
 # Copy everything into the container
 COPY . .
 
-# Ensure correct permissions (especially for the .n8n config folder)
-RUN chown -R node:node /home/node
-
-# Use the default startup command (n8n)
+# Use the default startup command
 CMD ["n8n"]
