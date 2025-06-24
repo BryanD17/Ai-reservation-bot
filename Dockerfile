@@ -1,14 +1,17 @@
 # Use official n8n image
 FROM n8nio/n8n
 
-# Optional: Copy your workflow file into the container (can also import via UI)
-COPY n8n_voice_reservation_final_mvp.json /data/workflows/
-
-# Set the working directory
+# Optional: Set working directory (but don't override important dirs)
 WORKDIR /data
 
-# Expose n8n's default port
+# Optional: Copy workflow JSON if needed
+COPY n8n_voice_reservation_final_mvp.json /data/
+
+# Optional: Set environment permissions enforcement
+ENV N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+
+# Expose default n8n port
 EXPOSE 5678
 
-# Start n8n
+# Use default startup command
 CMD ["n8n"]
