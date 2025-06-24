@@ -1,13 +1,13 @@
 # Use the official n8n image
 FROM n8nio/n8n:latest
 
-# Optional: Set working directory
-WORKDIR /home/node
+# Set the working directory
+WORKDIR /data
 
-# Use Railway ENV variables directly inside container
-ENV GENERIC_TIMEZONE="America/Chicago"
+# Copy your local files (including .env if needed)
+COPY . .
 
-# Expose the default n8n port
+# Expose port 5678 (default for n8n)
 EXPOSE 5678
 
 # Start n8n
