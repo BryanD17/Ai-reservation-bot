@@ -1,0 +1,213 @@
+{
+  "name": "Final Voice Reservation MVP",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "call-incoming",
+        "responseMode": "onReceived"
+      },
+      "id": "1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{$json[\"RecordingUrl\"]}}.mp3",
+        "responseFormat": "file",
+        "binaryPropertyName": "audio"
+      },
+      "id": "2",
+      "name": "Download Audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "model": "whisper-1",
+        "binaryPropertyName": "audio"
+      },
+      "id": "3",
+      "name": "Transcribe Audio",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "1",
+          "name": "OpenAI Main"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "prompt": "Extract reservation info from this transcription:\n{{$json.text}}\n\nReturn JSON:\n{ \"name\": \"John\", \"people\": 2, \"date\": \"2025-07-01\", \"time\": \"19:00\", \"phone\": \"+1234567890\" }",
+        "temperature": 0.3
+      },
+      "id": "4",
+      "name": "Extract Info (GPT-4o)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "1",
+          "name": "OpenAI Main"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "calendar": "primary",
+        "start": "={{$json.date}}T{{$json.time}}:00",
+        "end": "={{$json.date}}T{{$json.time}}:59",
+        "summary": "Reservation for {{$json.name}}",
+        "description": "Table for {{$json.people}} guests"
+      },
+      "id": "5",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "4",
+          "name": "Google Calendar API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "\nINSERT INTO reservations (name, party_size, res_date, res_time, phone)\nVALUES ('{{$json.name}}', {{$json.people}}, '{{$json.date}}', '{{$json.time}}', '{{$json.phone}}');\n"
+      },
+      "id": "6",
+      "name": "Log to Supabase",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "2",
+          "name": "Supabase DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "to": "={{$json.phone}}",
+        "from": "YOUR_TWILIO_NUMBER",
+        "message": "Reservation confirmed for {{$json.name}} at {{$json.time}} on {{$json.date}}."
+      },
+      "id": "7",
+      "name": "Send Confirmation SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        300
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "3",
+          "name": "Twilio Main"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Audio": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "Extract Info (GPT-4o)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Info (GPT-4o)": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Log to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "f0f88b09-600f-432a-880d-5f2b5ad73543"
+}
