@@ -1,0 +1,666 @@
+{
+  "name": "My workflow demo",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "url": "={{ $json.body.RecordingUrl }}.wav",
+        "responseFormat": "file",
+        "options": {}
+      },
+      "name": "Download Recording",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "id": "e4475bbb-93a0-4829-8052-23c0782173ce",
+      "position": [
+        -3400,
+        -260
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "o4PO55eNPoKJCTZN",
+          "name": "Twilio HTTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "items[0].json.code=(Math.floor(Math.random()*9000)+1000).toString(); return items;"
+      },
+      "name": "Generate Code",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "id": "7c9e7aba-5ef5-4a9f-be49-33f889c08bc1",
+      "position": [
+        -2640,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "50c79435-a088-4464-80bc-74980dd3d5f7",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "If Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "id": "218345d5-47e9-4f0f-989a-4c527031cad4",
+      "position": [
+        -2280,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "from": "+13126754886",
+        "to": "={{ $json.phone_number }}",
+        "message": "={{ $json.code ? `Your reservation for ${$json.date} at ${$json.time} is confirmed. Code: ${$json.code}` : `The requested slot is full. We can offer ${$json.suggested_time}. Reply YES to confirm.` }}",
+        "options": {}
+      },
+      "name": "Send SMS",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "id": "4ad843d9-331c-4165-aef9-a785aa83ef95",
+      "position": [
+        -1380,
+        -260
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "q9gJ4s4CTUjEaOHv",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Header",
+                "value": "Content-Type : text/xml"
+              }
+            ]
+          },
+          "responseKey": "<Response><Hangup/></Response>"
+        }
+      },
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "id": "530a6074-2aef-45be-a2c2-831c22eff7fd",
+      "position": [
+        -1220,
+        -260
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "options": {}
+      },
+      "name": "Transcribe Audio",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "id": "1ce49fb9-ee0e-4500-a62c-6f9a7f7b4382",
+      "position": [
+        -3160,
+        -280
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "PKABf0x8x1ccrIPS",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "GPT-4O"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Suggest no follow-ups. Extract the caller’s reservation details, and their phone number and respond ONLY with a JSON object like {\"name\":\"...\", \"party\":4, \"date\":\"YYYY-MM-DD\", \"time\":\"HH:MM\"}",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.text }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "name": "Extract info (GPT-4o)",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "id": "374a47d6-6090-4b49-92a6-87df15d71b8b",
+      "position": [
+        -2960,
+        -280
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "PKABf0x8x1ccrIPS",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Suggest the nearest available reservation time 30-90 minutes from the requested slot. Respond ONLY JSON {\"suggested_time\":\"HH:MM\"}",
+              "role": "system"
+            },
+            {
+              "content": "={{`Date: ${$json.date}, Time: ${$json.time}, Party: ${$json.party}`}}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {}
+      },
+      "name": "Suggest Time",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "id": "e8d2e3c8-80f3-48a6-b98e-3ba02ead7f66",
+      "position": [
+        -1900,
+        -240
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "PKABf0x8x1ccrIPS",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ec6f9128-d26e-4dfc-8f7f-9d6d558b3b4e",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "id": "8ef3f491-9636-41c4-b958-58431a6d44a1",
+      "position": [
+        -3600,
+        -260
+      ],
+      "webhookId": "ec6f9128-d26e-4dfc-8f7f-9d6d558b3b4e"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "13dde2e6-abad-47ed-8d3b-2c3d467a82a1",
+              "name": "available",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2460,
+        -280
+      ],
+      "id": "f07cb4ed-6491-49f1-9d0d-92e458a85ea8",
+      "name": "Mock Availability"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8fc58231-282a-45ce-b481-349c3754e302",
+              "name": "customer_name",
+              "value": "={{ $json.message.content.name }}",
+              "type": "string"
+            },
+            {
+              "id": "630da0f1-ff53-4672-9cd8-6e9e275f0443",
+              "name": "phone_number",
+              "value": "={{ $json.from }}",
+              "type": "string"
+            },
+            {
+              "id": "2710d2a2-f423-40e6-b3a0-1e13dc265246",
+              "name": "reservation_date",
+              "value": "={{ $json.message.content.date + 'T' + $json.message.content.time + ':00-05:00' }}",
+              "type": "string"
+            },
+            {
+              "id": "00545e5a-3849-4331-9ba5-e3d8358afeaa",
+              "name": "confirmation_code",
+              "value": "={{ $json.code }}",
+              "type": "string"
+            },
+            {
+              "id": "58f8d3f4-2620-4f8c-ac12-ef1b0b6c013e",
+              "name": "number_of_guests",
+              "value": "={{ $json.message.content.party }}",
+              "type": "number"
+            },
+            {
+              "id": "bf3f4f30-b2a1-4f72-8634-52478b1c6dd2",
+              "name": "notes",
+              "value": "={{ $json.notes || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4f9d9dea-15e3-4f50-ba0c-c4f00d481bcf",
+              "name": "restaurant_id",
+              "value": "={{ 'b876baf6-e613-46ce-9464-1b12d5af3e64' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1800,
+        -400
+      ],
+      "id": "03570abd-8fa3-4d13-9e88-f8a8eb0969a8",
+      "name": "Parse"
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "reservations",
+          "mode": "list",
+          "cachedResultName": "reservations"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "number_of_guests": "={{ $json.number_of_guests }}",
+            "customer_name": "={{ $json.customer_name }}",
+            "phone_number": "={{ $json.phone_number }}",
+            "reservation_date": "={{ $json.reservation_date }}",
+            "confirmation_code": "={{ $json.confirmation_code }}",
+            "notes": "={{ $json.notes }}",
+            "restaurant_id": "={{ $json.restaurant_id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "customer_name",
+              "displayName": "customer_name",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone_number",
+              "displayName": "phone_number",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reservation_date",
+              "displayName": "reservation_date",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "confirmation_code",
+              "displayName": "confirmation_code",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "number_of_guests",
+              "displayName": "number_of_guests",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notes",
+              "displayName": "notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "restaurant_id",
+              "displayName": "restaurant_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1620,
+        -400
+      ],
+      "id": "561341a9-746b-4f65-ba61-78677be50c92",
+      "name": "Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "7LpTBrS592f7ILG6",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $json.body.AccountSid }}/Calls/{{ $json.body.CallSid }}.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3100,
+        -440
+      ],
+      "id": "8990235b-65c8-4c5a-aa3c-2df5455ff380",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "o4PO55eNPoKJCTZN",
+          "name": "Twilio HTTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1980,
+        -400
+      ],
+      "id": "2efa1043-dae3-4f26-9ea1-4dac6075c70e",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Download Recording": {
+      "main": [
+        [
+          {
+            "node": "Transcribe Audio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Code": {
+      "main": [
+        [
+          {
+            "node": "Mock Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Available?": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Suggest Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send SMS": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe Audio": {
+      "main": [
+        [
+          {
+            "node": "Extract info (GPT-4o)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract info (GPT-4o)": {
+      "main": [
+        [
+          {
+            "node": "Generate Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggest Time": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Download Recording",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock Availability": {
+      "main": [
+        [
+          {
+            "node": "If Available?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Send SMS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4b64013b-13f6-4a77-aeab-56bfec3f373c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3bc3f4c0bcdbba255d7fdd7c4f1b3f7670527d13524463802bffc7717a8a679a"
+  },
+  "id": "bwKbBSIwKUnrYYnL",
+  "tags": []
+}
