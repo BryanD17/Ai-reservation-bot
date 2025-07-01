@@ -1,99 +1,104 @@
-# Voice-to-Table – AI Reservation Assistant for Small Restaurants
-*(Built with Twilio, n8n Cloud, OpenAI Whisper + GPT-4o, and Supabase)*
+# Voice-to-Table — AI Reservation Assistant for Small Restaurants  
+(Built with Twilio, n8n Cloud, OpenAI Whisper + GPT-4o, and Supabase)
 
 ---
 
-## 🌮 What problem does it solve?
-Small restaurants miss bookings because nobody can answer the phone 24 × 7.  
-Voice-to-Table answers every call, understands the guest’s spoken request, checks table availability, and texts back a confirmation code—all hands-free for staff.
+## Overview
+
+Voice-to-Table turns any restaurant phone line into a 24-hour reservation desk.  
+When a guest calls, the system records the request, extracts the booking details with speech-to-text and language models, checks table availability, stores the reservation, and sends the guest a confirmation SMS—all without staff involvement.
 
 ---
 
-## 🏗️ How it works (human-friendly overview)
+## High-Level Workflow
 
-Guest calls ➜ Twilio greets & records voice
-➜ n8n downloads audio
-➜ OpenAI Whisper turns speech into text
-➜ GPT-4o pulls out name, date, time, party size
-➜ n8n checks table availability
-➜ n8n saves booking to Supabase, makes a 4-digit code
-➜ Twilio SMS sends confirmation to the caller
+Guest call → Twilio greets and records voice
+Recording link → n8n downloads audio
+Audio → OpenAI Whisper transcribes speech
+Text → GPT-4o extracts name, date, time, party size
+Details → n8n checks availability (OpenTable/Google Calendar)
+Booking row → Supabase stores reservation and confirmation code
+SMS → Twilio sends confirmation to the caller
 
 
----
-
-## 🔧 Building blocks explained in plain language
-
-| Piece | What it is | Why we use it |
-|-------|------------|---------------|
-| **Twilio Phone Number** | Cloud phone line | Answers calls, records them, sends SMS |
-| **TwiML Bin** | Tiny XML script | Says greeting, starts recording, thanks caller, hangs up |
-| **n8n Cloud** | Drag-and-drop automation | Orchestrates the whole workflow—no servers to manage |
-| **Webhook node** | Listening URL | Receives Twilio’s callback with recording link |
-| **Download Recording node** | File grabber | Pulls the guest’s voice file |
-| **OpenAI Whisper node** | Speech-to-text AI | Converts voice to plain text |
-| **OpenAI GPT-4o node** | Language AI | Extracts the booking details from that text |
-| **HTTP Request node** | Simple API call | Fetches caller’s phone # from Twilio |
-| **Merge node** | Combiner | Joins the AI output with the phone number |
-| **Supabase (Postgres)** | Hosted database | Stores each reservation row forever |
-| **Twilio SMS node** | Text sender | Delivers confirmation or alternate time |
 
 ---
 
-## 📂 Repository contents
+## Key Components
 
-| File / Folder | What it is |
-|---------------|------------|
-| `Dockerfile` | Lightweight image to self-host n8n + workflow (Railway, Render, etc.) |
-| `voice_reservation_full_mvp2025_v4.json` | The n8n workflow you import into n8n Cloud |
-| `twiml/Reservation-Flow.xml` | One-file TwiML: greet → record → thank + hangup |
-| `supabase/reservations.sql` | SQL to create the `reservations` table |
-| `README.md` | ← this file |
-
----
-
-## 🚀 Call flow in detail
-
-1. Guest dials the restaurant’s Twilio number.  
-2. **TwiML** greets, records their spoken request, then hangs up.  
-3. Twilio posts the recording link + call SID to the **n8n Webhook**.  
-4. **Download Recording** gets the audio; **Whisper** transcribes it.  
-5. **GPT-4o** returns `{ name:"Brian", party:4, date:"2025-07-08", time:"19:00" }`.  
-6. **HTTP Request** asks Twilio “Who called this call SID?” → `"from":"+17736558730"`.  
-7. **Merge** combines transcript + phone number.  
-8. n8n generates a 4-digit confirmation code and (in demo) marks slot available.  
-9. **Supabase** inserts the row.  
-10. **Twilio SMS** sends:  
-    “Brian, your table for 4 on Jul 8 at 7 PM is confirmed. Code 5938. Reply STOP to cancel texts.”  
-11. Workflow responds `<Hangup/>` to Twilio—call already ended politely.
+| Component | Purpose | Notes |
+|-----------|---------|-------|
+| **Twilio Phone Number** | Receives calls and sends SMS | One number per restaurant |
+| **TwiML Bin** | Plays greeting, records caller, ends call | XML hosted in Twilio |
+| **n8n Cloud** | Orchestrates the workflow | No server maintenance required |
+| **Download Recording** | Retrieves the audio file | Provides data for transcription |
+| **OpenAI Whisper** | Speech-to-text | Converts caller audio to text |
+| **OpenAI GPT-4o** | Natural-language parsing | Extracts structured booking data |
+| **HTTP Request (Twilio API)** | Retrieves caller phone number | Uses Call SID |
+| **Merge (by position)** | Combines AI output and phone number | Ensures one item with all data |
+| **Supabase (Postgres)** | Stores reservations | Reliable, hosted database |
+| **Twilio SMS** | Sends confirmation or alternative time | Uses A2P-compliant templates |
 
 ---
 
-## 🎯 Ideal client
+## Repository Structure
 
-| Ideal customer | Why they care |
-|----------------|--------------|
-| **Independent restaurant / small chain** | No dedicated host to answer phones |
-| **Takes voice bookings** | Automation replaces missed calls |
-| **Average ticket \$25+** | One saved table pays the monthly fee |
-| **Uses OpenTable or Google Calendar** | Integrates with their existing system |
-
----
-
-## 📈 Roadmap
-
-* ✅ Demo/mock mode (auto-approve every booking)  
-* 🔜 Live OpenTable + Google Calendar fallback  
-* 🔜 Voice-driven cancellation (“cancel code 5938”)  
-* 🔜 Owner dashboard (Supabase + React)  
-* 🔜 Multi-language Polly voices
+| Path | Description |
+|------|-------------|
+| `Dockerfile` | Minimal Node 18-alpine image for optional self-hosting |
+| `voice_reservation_full_mvp2025_v4.json` | n8n workflow file |
+| `twiml/Reservation-Flow.xml` | Single-file TwiML (greet → record → thank → hang up) |
+| `supabase/reservations.sql` | SQL schema for the `reservations` table |
+| `README.md` | Project documentation |
 
 ---
 
-## 🤝 Contributing
-Open issues or PRs welcome. Ping **@your-github-handle** for questions.
+## Detailed Call Flow
+
+1. Guest dials the Twilio number.  
+2. TwiML Bin greets the caller, records up to 40 seconds, then hangs up.  
+3. Twilio posts the recording URL and Call SID to the n8n webhook.  
+4. n8n downloads the recording; Whisper transcribes the audio.  
+5. GPT-4o converts the transcript into JSON containing name, party size, date, and time.  
+6. n8n calls Twilio’s REST API to obtain the caller’s phone number (`from`).  
+7. A Merge node combines booking data and phone number.  
+8. n8n generates a four-digit confirmation code and checks availability (mock, OpenTable, or Google Calendar).  
+9. The reservation is inserted into Supabase with status `confirmed`.  
+10. Twilio sends an SMS:  
+   “Joe’s Bistro: table for 4 on 8 July at 7 PM confirmed. Code 5938. Reply STOP to cancel texts.”  
+11. The workflow responds with `<Hangup/>`; the caller hears a closing message and the call ends.
 
 ---
 
-## 📝 License
-Code in this repo is MIT. n8n workflow files are under the n8n Fair Code license—see `LICENSE`.
+## Target Client Profile
+
+| Attribute | Benefit |
+|-----------|---------|
+| Independently owned restaurant or small chain | Removes need for a full-time host |
+| Relies on phone bookings | Captures calls outside business hours |
+| Average check value above \$25 | One saved booking justifies subscription |
+| Already uses OpenTable or Google Calendar | Integrates without new hardware |
+
+---
+
+## Roadmap
+
+* Live availability via OpenTable API, with Google Calendar fallback  
+* Voice-driven cancellation by confirmation code  
+* Owner dashboard (Supabase + React)  
+* Optional multilingual voice prompts (Amazon Polly)  
+
+---
+
+## Contributing
+
+Pull requests and issue reports are welcome.  
+Contact **[your-GitHub-handle]** for questions.
+
+---
+
+## License
+
+* Repository source code: MIT  
+* n8n workflow files: n8n Fair Code license (see `LICENSE`)
+
